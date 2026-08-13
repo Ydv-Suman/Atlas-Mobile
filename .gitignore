@@ -10,8 +10,10 @@ AGENTS.md
 
 # Expo
 .expo/
+.eas/
 dist/
 web-build/
+build/
 expo-env.d.ts
 
 # Native
@@ -30,6 +32,8 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+pnpm-debug.*
+*.log
 
 # macOS
 .DS_Store
@@ -37,10 +41,24 @@ yarn-error.*
 
 # local env files
 .env
+.env.*
 .env*.local
+!.env.example
+!.env.sample
+
+# editor
+.vscode/
+.idea/
 
 # typescript
 *.tsbuildinfo
+
+# tests
+coverage/
+
+# temporary files
+tmp/
+temp/
 
 # generated native folders
 /ios

@@ -15,6 +15,15 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface UpdateProfileRequest {
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  email?: string;
+  currentPassword?: string;
+  password?: string;
+}
+
 export interface LoginResponse {
   message: string;
   username: string;
@@ -33,6 +42,15 @@ export interface UserDto {
   emailVerified: boolean;
   githubAuthorized: boolean;
   createdAt: string;
+}
+
+interface GithubAuthorizeResponse {
+  authorizationUrl: string;
+}
+
+interface CsrfResponse {
+  headerName: string;
+  token: string;
 }
 
 interface ApiResponse<T> {
@@ -56,6 +74,31 @@ export const authApi = {
 
   fetchUser: () =>
     axiosClient.get<UserDto>(AUTH_ENDPOINTS.FETCH_USER),
+
+  updateProfile: async (data: UpdateProfileRequest) => {
+    const csrf = await axiosClient.get<CsrfResponse>(
+      AUTH_ENDPOINTS.CSRF_PUBLIC,
+      { params: { v: '1.0' } },
+    );
+
+    return axiosClient.put<ApiResponse<null>>(
+      AUTH_ENDPOINTS.UPDATE_USER,
+      data,
+      {
+        params: { v: '1.0' },
+        headers: {
+          [csrf.data.headerName]: csrf.data.token,
+        },
+      },
+    );
+  },
+
+  authorizeGithub: () =>
+    axiosClient.post<GithubAuthorizeResponse>(
+      AUTH_ENDPOINTS.GITHUB_AUTHORIZE,
+      null,
+      { params: { v: '1.0' } },
+    ),
 
   logout: () =>
     axiosClient.post<ApiResponse<null>>(AUTH_ENDPOINTS.LOGOUT),

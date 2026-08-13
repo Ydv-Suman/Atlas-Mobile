@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.text,
-    fontSize: fontSize.md,
+    fontSize: fontSize.lg,
     fontWeight: '600',
   },
   secondaryLabel: {

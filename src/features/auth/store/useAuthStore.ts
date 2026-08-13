@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authApi, LoginResponse, UserDto } from '../api/authApi';
+import { authApi, UserDto } from '../api/authApi';
 import { saveSecure, getSecure, deleteSecure } from '../../../core/storage/secureStore';
 import { STORAGE_KEYS } from '../../../core/constants/storageKeys';
 import axios from 'axios';
@@ -65,18 +65,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // ignore logout API failure
     }
-    await deleteSecure(STORAGE_KEYS.JWT_TOKEN);
-    set({ jwt: null, user: null, error: null });
+    await Promise.all(
+      Object.values(STORAGE_KEYS).map((key) => deleteSecure(key)),
+    );
+    set({ jwt: null, user: null, error: null, pendingVerificationEmail: null });
   },
 
   fetchUser: async () => {
     try {
       const { data } = await authApi.fetchUser();
       set({ user: data });
-    } catch {
-      // token invalid
-      await deleteSecure(STORAGE_KEYS.JWT_TOKEN);
-      set({ jwt: null, user: null });
+    } catch (e) {
+      if (axios.isAxiosError(e) && e.response?.status === 401) {
+        await deleteSecure(STORAGE_KEYS.JWT_TOKEN);
+        set({ jwt: null, user: null });
+      }
     }
   },
 
