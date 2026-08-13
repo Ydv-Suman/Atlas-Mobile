@@ -190,11 +190,11 @@ const styles = StyleSheet.create({
   },
   footerText: {
     color: colors.textSecondary,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.md,
   },
   link: {
     color: colors.primary,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.md,
     fontWeight: '600',
   },
 });
