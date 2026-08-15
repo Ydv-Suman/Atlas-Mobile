@@ -6,6 +6,7 @@ import { colors, fontSize, spacing } from '../theme/appTheme';
 import { useAuthStore } from '../../features/auth/store/useAuthStore';
 import ProfileScreen, { getUserInitials } from '../../features/profile/screens/ProfileScreen';
 import GitScreen from '../../features/git/screens/GitScreen';
+import WorkspaceScreen from '../../features/workspace/screens/WorkspaceScreen';
 
 export type MainTabParamList = {
   Workspace: undefined;
@@ -42,7 +43,7 @@ export default function MainTabs() {
         <Tab.Screen
           key={tab.name}
           name={tab.name}
-          component={tab.name === 'Git' ? GitScreen : TabPlaceholderScreen}
+          component={tab.name === 'Workspace' ? WorkspaceScreen : tab.name === 'Git' ? GitScreen : TabPlaceholderScreen}
           options={{
             title: tab.label,
             tabBarIcon: ({ color }) => (
