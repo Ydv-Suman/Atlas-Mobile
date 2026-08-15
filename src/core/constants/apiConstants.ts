@@ -11,3 +11,8 @@ export const AUTH_ENDPOINTS = {
   UPDATE_USER: '/api/users/update',
   GITHUB_AUTHORIZE: '/api/github/authorize',
 } as const;
+
+export const WORKSPACE_ENDPOINTS = {
+  REPOS: '/api/workspace/repos',
+  PROJECTS: '/api/workspace/projects',
+} as const;
