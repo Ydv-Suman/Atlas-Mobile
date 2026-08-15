@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +24,9 @@ export default function WorkspaceScreen() {
     error,
     fetchProjects,
     fetchRepos,
+    createProject,
+    deleteProject,
+    setActiveProject,
     clearError,
   } = useWorkspaceStore();
 
@@ -35,6 +39,49 @@ export default function WorkspaceScreen() {
     fetchProjects();
     fetchRepos();
   }, []);
+
+  const handleRepoPress = useCallback((repo: GithubRepo) => {
+    Alert.alert(
+      'Create Project',
+      `Create a project from "${repo.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Create',
+          onPress: async () => {
+            const ok = await createProject({
+              projectName: repo.name,
+              githubUrl: repo.html_url,
+              repoOwner: repo.owner.login,
+              repoOwnership: 'PERSONAL',
+              repoVisibility: repo.private ? 'PRIVATE' : 'PUBLIC',
+            });
+            if (ok) fetchProjects();
+          },
+        },
+      ],
+    );
+  }, [createProject, fetchProjects]);
+
+  const handleProjectPress = useCallback((project: WorkspaceProject) => {
+    setActiveProject(project.id);
+    // ponytail: navigate to PromptScreen when agent feature exists
+  }, [setActiveProject]);
+
+  const handleProjectLongPress = useCallback((project: WorkspaceProject) => {
+    Alert.alert(
+      'Delete Project',
+      `Remove "${project.projectName}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteProject(project.id),
+        },
+      ],
+    );
+  }, [deleteProject]);
 
   const isRefreshing = isLoadingProjects || isLoadingRepos;
 
@@ -65,7 +112,14 @@ export default function WorkspaceScreen() {
             ) : projects.length === 0 ? (
               <EmptyState message="No projects yet. Create one from a repository below." />
             ) : (
-              projects.map((p) => <ProjectCard key={p.id} project={p} />)
+              projects.map((p) => (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  onPress={() => handleProjectPress(p)}
+                  onLongPress={() => handleProjectLongPress(p)}
+                />
+              ))
             )}
 
             <SectionHeader
@@ -81,7 +135,13 @@ export default function WorkspaceScreen() {
             ) : repos.length === 0 ? (
               <EmptyState message="No repositories found on your GitHub account." />
             ) : (
-              repos.map((r) => <RepoCard key={r.id} repo={r} />)
+              repos.map((r) => (
+                <RepoCard
+                  key={r.id}
+                  repo={r}
+                  onPress={() => handleRepoPress(r)}
+                />
+              ))
             )}
           </>
         }
@@ -109,9 +169,9 @@ function SectionHeader({
   );
 }
 
-function ProjectCard({ project }: { project: WorkspaceProject }) {
+function ProjectCard({ project, onPress, onLongPress }: { project: WorkspaceProject; onPress: () => void; onLongPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={onPress} onLongPress={onLongPress}>
       <View style={styles.cardTop}>
         <View style={styles.cardTitleRow}>
           <Ionicons name="folder-outline" size={18} color={colors.primary} />
@@ -130,9 +190,9 @@ function ProjectCard({ project }: { project: WorkspaceProject }) {
   );
 }
 
-function RepoCard({ repo }: { repo: GithubRepo }) {
+function RepoCard({ repo, onPress }: { repo: GithubRepo; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={onPress}>
       <View style={styles.cardTop}>
         <View style={styles.cardTitleRow}>
           <Ionicons name="book-outline" size={18} color={colors.textSecondary} />
