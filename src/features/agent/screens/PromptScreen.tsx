@@ -7,7 +7,8 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Alert,
+  Modal,
+  FlatList,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, fontSize, spacing, borderRadius } from '../../../core/theme/appTheme';
 import { useAgentStore } from '../store/useAgentStore';
 import { MainStackParamList } from '../../../core/navigation/MainStack';
+import { WORKSPACE_ENDPOINTS } from '../../../core/constants/apiConstants';
+import axiosClient from '../../../core/network/axiosClient';
 import ErrorBanner from '../../../shared/components/ErrorBanner';
 
 type Nav = NativeStackNavigationProp<MainStackParamList, 'Prompt'>;
@@ -23,10 +26,24 @@ type Route = RouteProp<MainStackParamList, 'Prompt'>;
 
 const PROVIDERS = ['deepseek', 'claude', 'openai'] as const;
 
+interface TreeEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+  size: number;
+}
+
 export default function PromptScreen() {
   const nav = useNavigation<Nav>();
   const { params } = useRoute<Route>();
   const [prompt, setPrompt] = useState('');
+
+  // File browser state
+  const [showFiles, setShowFiles] = useState(false);
+  const [treePath, setTreePath] = useState('');
+  const [treeEntries, setTreeEntries] = useState<TreeEntry[]>([]);
+  const [treeLoading, setTreeLoading] = useState(false);
+  const [treeError, setTreeError] = useState<string | null>(null);
 
   const {
     jobStatus,
@@ -46,9 +63,36 @@ export default function PromptScreen() {
     if (jobId) {
       setPrompt('');
       // ponytail: navigate to JobStatusScreen when built
-      // nav.replace('JobStatus', { jobId });
     }
   }, [canSubmit, submitPrompt, params.projectId, prompt]);
+
+  const fetchTree = useCallback(async (path: string) => {
+    setTreeLoading(true);
+    setTreeError(null);
+    try {
+      const { data } = await axiosClient.get(
+        WORKSPACE_ENDPOINTS.PROJECT_TREE(params.projectId, path),
+      );
+      setTreeEntries(data.data ?? []);
+      setTreePath(path);
+    } catch {
+      setTreeError('Failed to load files');
+    } finally {
+      setTreeLoading(false);
+    }
+  }, [params.projectId]);
+
+  const openFileBrowser = useCallback(() => {
+    setShowFiles(true);
+    fetchTree('');
+  }, [fetchTree]);
+
+  const navigateUp = useCallback(() => {
+    const parent = treePath.includes('/')
+      ? treePath.substring(0, treePath.lastIndexOf('/'))
+      : '';
+    fetchTree(parent);
+  }, [treePath, fetchTree]);
 
   return (
     <KeyboardAvoidingView
@@ -62,13 +106,7 @@ export default function PromptScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {params.projectName}
         </Text>
-        <TouchableOpacity
-          onPress={() => {
-            // ponytail: navigate to FileBrowserScreen when built
-            Alert.alert('Files', 'File browser coming soon.');
-          }}
-          hitSlop={12}
-        >
+        <TouchableOpacity onPress={openFileBrowser} hitSlop={12}>
           <Ionicons name="folder-open-outline" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
@@ -129,15 +167,66 @@ export default function PromptScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* File Browser Modal */}
+      <Modal visible={showFiles} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowFiles(false)} hitSlop={12}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle} numberOfLines={1}>
+              {treePath || params.projectName}
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          {treePath !== '' && (
+            <TouchableOpacity style={styles.upRow} onPress={navigateUp}>
+              <Ionicons name="arrow-up-outline" size={18} color={colors.primary} />
+              <Text style={styles.upText}>..</Text>
+            </TouchableOpacity>
+          )}
+
+          {treeError && <ErrorBanner message={treeError} onDismiss={() => setTreeError(null)} />}
+
+          {treeLoading ? (
+            <ActivityIndicator color={colors.primary} style={styles.loader} />
+          ) : (
+            <FlatList
+              data={treeEntries}
+              keyExtractor={(item) => item.path}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.treeRow}
+                  onPress={() => item.type === 'dir' && fetchTree(item.path)}
+                  disabled={item.type === 'file'}
+                  activeOpacity={item.type === 'dir' ? 0.6 : 1}
+                >
+                  <Ionicons
+                    name={item.type === 'dir' ? 'folder' : 'document-outline'}
+                    size={20}
+                    color={item.type === 'dir' ? colors.warning : colors.textSecondary}
+                  />
+                  <Text style={styles.treeName}>{item.name}</Text>
+                  {item.type === 'dir' && (
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  )}
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>No files found</Text>
+              }
+            />
+          )}
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -154,26 +243,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: spacing.sm,
   },
-  body: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'space-between',
-  },
-  input: {
-    flex: 1,
-    fontSize: fontSize.md,
-    color: colors.text,
-    paddingTop: spacing.md,
-    lineHeight: 24,
-  },
-  footer: {
-    paddingBottom: spacing.xl,
-    gap: spacing.md,
-  },
-  providerRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
+  body: { flex: 1, paddingHorizontal: spacing.lg, justifyContent: 'space-between' },
+  input: { flex: 1, fontSize: fontSize.md, color: colors.text, paddingTop: spacing.md, lineHeight: 24 },
+  footer: { paddingBottom: spacing.xl, gap: spacing.md },
+  providerRow: { flexDirection: 'row', gap: spacing.sm },
   providerChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -182,20 +255,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  providerChipActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary + '10',
-  },
-  providerLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: '500',
-    color: colors.textSecondary,
-    textTransform: 'capitalize',
-  },
-  providerLabelActive: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
+  providerChipActive: { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
+  providerLabel: { fontSize: fontSize.sm, fontWeight: '500', color: colors.textSecondary, textTransform: 'capitalize' },
+  providerLabelActive: { color: colors.primary, fontWeight: '600' },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -205,12 +267,38 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: borderRadius.md,
   },
-  submitBtnDisabled: {
-    opacity: 0.5,
+  submitBtnDisabled: { opacity: 0.5 },
+  submitLabel: { fontSize: fontSize.md, fontWeight: '600', color: '#fff' },
+  // Modal styles
+  modalContainer: { flex: 1, backgroundColor: colors.background, paddingTop: 60 },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
-  submitLabel: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: '#fff',
+  modalTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text, flex: 1, textAlign: 'center', marginHorizontal: spacing.sm },
+  upRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
+  upText: { fontSize: fontSize.md, color: colors.primary, fontWeight: '500' },
+  treeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  treeName: { fontSize: fontSize.md, color: colors.text, flex: 1 },
+  emptyText: { fontSize: fontSize.sm, color: colors.textMuted, textAlign: 'center', padding: spacing.xl },
+  loader: { padding: spacing.xl },
 });

@@ -15,6 +15,8 @@ export const AUTH_ENDPOINTS = {
 export const WORKSPACE_ENDPOINTS = {
   REPOS: '/api/workspace/repos',
   PROJECTS: '/api/workspace/projects',
+  PROJECT_TREE: (id: string, path = '') =>
+    `/api/workspace/projects/${id}/tree${path ? `?path=${encodeURIComponent(path)}` : ''}`,
 } as const;
 
 export const AGENT_ENDPOINTS = {
