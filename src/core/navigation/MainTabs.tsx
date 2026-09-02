@@ -5,13 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize, spacing } from '../theme/appTheme';
 import { useAuthStore } from '../../features/auth/store/useAuthStore';
 import ProfileScreen, { getUserInitials } from '../../features/profile/screens/ProfileScreen';
-import GitScreen from '../../features/git/screens/GitScreen';
+import ConnectScreen from '../../features/settings/screens/ConnectScreen';
 import WorkspaceScreen from '../../features/workspace/screens/WorkspaceScreen';
+import AgentTabScreen from '../../features/agent/screens/AgentTabScreen';
 
 export type MainTabParamList = {
   Workspace: undefined;
   Agent: undefined;
-  Git: undefined;
+  Connect: undefined;
   Profile: undefined;
 };
 
@@ -24,7 +25,7 @@ const tabs: Array<{
 }> = [
   { name: 'Workspace', label: 'Workspace', icon: 'grid-outline' },
   { name: 'Agent', label: 'Agent', icon: 'sparkles-outline' },
-  { name: 'Git', label: 'Git', icon: 'git-branch-outline' },
+  { name: 'Connect', label: 'Connect', icon: 'settings-outline' },
 ];
 
 export default function MainTabs() {
@@ -43,7 +44,7 @@ export default function MainTabs() {
         <Tab.Screen
           key={tab.name}
           name={tab.name}
-          component={tab.name === 'Workspace' ? WorkspaceScreen : tab.name === 'Git' ? GitScreen : TabPlaceholderScreen}
+          component={tab.name === 'Workspace' ? WorkspaceScreen : tab.name === 'Agent' ? AgentTabScreen : ConnectScreen}
           options={{
             title: tab.label,
             tabBarIcon: ({ color }) => (
