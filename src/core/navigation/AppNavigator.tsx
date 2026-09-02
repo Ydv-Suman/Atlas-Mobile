@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { useAuthStore } from '../../features/auth/store/useAuthStore';
 import AuthStack from './AuthStack';
-import MainTabs from './MainTabs';
+import MainStack from './MainStack';
 import LoadingSpinner from '../../shared/components/LoadingSpinner';
 
 export default function AppNavigator() {
@@ -20,7 +20,7 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer>
-      {jwt ? <MainTabs /> : <AuthStack />}
+      {jwt ? <MainStack /> : <AuthStack />}
     </NavigationContainer>
   );
 }

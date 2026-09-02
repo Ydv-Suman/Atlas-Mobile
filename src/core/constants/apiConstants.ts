@@ -16,3 +16,12 @@ export const WORKSPACE_ENDPOINTS = {
   REPOS: '/api/workspace/repos',
   PROJECTS: '/api/workspace/projects',
 } as const;
+
+export const AGENT_ENDPOINTS = {
+  JOBS: '/api/agent/jobs',
+  JOB: (jobId: string) => `/api/agent/jobs/${jobId}`,
+  PROJECT_JOBS: (projectId: string) => `/api/agent/jobs/project/${projectId}`,
+  PUSH: (jobId: string) => `/api/agent/git/push/${jobId}`,
+  PR: (jobId: string) => `/api/agent/git/pr/${jobId}`,
+  KEYS: '/api/agent/keys',
+} as const;

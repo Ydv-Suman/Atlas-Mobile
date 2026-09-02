@@ -10,12 +10,18 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, fontSize, spacing, borderRadius } from '../../../core/theme/appTheme';
 import { useWorkspaceStore } from '../store/useWorkspaceStore';
 import { GithubRepo, WorkspaceProject } from '../api/workspaceApi';
+import { MainStackParamList } from '../../../core/navigation/MainStack';
 import ErrorBanner from '../../../shared/components/ErrorBanner';
 
+type Nav = NativeStackNavigationProp<MainStackParamList>;
+
 export default function WorkspaceScreen() {
+  const nav = useNavigation<Nav>();
   const {
     projects,
     repos,
@@ -65,8 +71,11 @@ export default function WorkspaceScreen() {
 
   const handleProjectPress = useCallback((project: WorkspaceProject) => {
     setActiveProject(project.id);
-    // ponytail: navigate to PromptScreen when agent feature exists
-  }, [setActiveProject]);
+    nav.navigate('Prompt', {
+      projectId: String(project.id),
+      projectName: project.projectName,
+    });
+  }, [setActiveProject, nav]);
 
   const handleProjectLongPress = useCallback((project: WorkspaceProject) => {
     Alert.alert(
