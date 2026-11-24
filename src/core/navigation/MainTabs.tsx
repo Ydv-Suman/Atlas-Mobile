@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import { BottomTabBar, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import ProfileScreen, { getUserInitials } from '../../features/profile/screens/P
 import ConnectScreen from '../../features/settings/screens/ConnectScreen';
 import WorkspaceScreen from '../../features/workspace/screens/WorkspaceScreen';
 import AgentTabScreen from '../../features/agent/screens/AgentTabScreen';
+import { useWorkspaceStore } from '../../features/workspace/store/useWorkspaceStore';
 
 export type MainTabParamList = {
   Workspace: undefined;
@@ -31,9 +32,13 @@ const tabs: Array<{
 
 export default function MainTabs() {
   const insets = useSafeAreaInsets();
+  const account = useAuthStore(state => state.user?.username ?? null);
+  const restoreProject = useWorkspaceStore(state => state.restoreProject);
+  useLayoutEffect(() => { void restoreProject(account); }, [account, restoreProject]);
 
   return (
     <Tab.Navigator
+      key={account ?? 'loading-account'}
       safeAreaInsets={{ bottom: 0 }}
       tabBar={(props) => (
         <View style={[styles.tabBarContainer, { paddingBottom: Math.max(insets.bottom - 20, 6) }]}>

@@ -1,13 +1,21 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { ActivityIndicator, TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../core/theme/appTheme';
 import { useWorkspaceStore } from '../../workspace/store/useWorkspaceStore';
 import AgentWorkspace from '../components/AgentWorkspace';
+import { useAuthStore } from '../../auth/store/useAuthStore';
 
 export default function AgentTabScreen() {
-  const activeProjectId = useWorkspaceStore(s => s.activeProjectId);
-  const projects = useWorkspaceStore(s => s.projects);
-  const activeProject = projects.find(project => project.id === activeProjectId);
+  const account = useAuthStore(state => state.user?.username ?? null);
+  const { activeProjectId, projects, account: workspaceAccount, isRestoringProject, isLoadingProjects, error, fetchProjects } = useWorkspaceStore();
+  const activeProject = workspaceAccount === account ? projects.find(project => project.id === activeProjectId) : undefined;
+
+  if (!activeProject && (!account || workspaceAccount !== account || isRestoringProject || isLoadingProjects)) {
+    return <View style={styles.empty}><ActivityIndicator color={colors.textSecondary} accessibilityLabel="Restoring last project" /></View>;
+  }
+  if (!activeProject && error) {
+    return <View style={styles.empty}><Text style={styles.hint}>{error}</Text><TouchableOpacity onPress={() => { void fetchProjects(); }} accessibilityRole="button" accessibilityLabel="Retry loading projects"><Text style={styles.title}>Retry</Text></TouchableOpacity></View>;
+  }
 
   if (!activeProject) {
     return (
