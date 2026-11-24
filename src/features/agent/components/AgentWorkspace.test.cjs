@@ -205,6 +205,12 @@ test('a conflicting automatic save keeps the local edit and does not retry in a 
   ui.scheduleAutoSave(); assert.equal(ui.timerCount(), 0); assert.equal(reads, 1);
   await ui.button('Send prompt').props.onPress();
   assert.equal(ui.submissions.length, 1); assert.equal(reads, 1);
+  ui.button('Reload workspace file').props.onPress();
+  assert.equal(ui.button('Edit file.py').props.value, 'local change');
+  assert.equal(ui.alerts[0][2][0].text, 'Cancel');
+  await ui.alerts[0][2][1].onPress();
+  assert.equal(ui.button('Edit file.py').props.value, 'agent change');
+  ui.scheduleAutoSave(); assert.equal(ui.timerCount(), 0);
 });
 
 
