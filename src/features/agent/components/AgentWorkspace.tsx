@@ -19,6 +19,8 @@ import { agentApi, JobFilePreview } from '../api/agentApi';
 import { mergePreviewTree } from '../previewTree';
 import { jobErrorReason } from '../jobFeedback';
 import AgentChat from './AgentChat';
+import GitPanel from './GitPanel';
+import { GitAction, gitApi, GitStatus } from '../api/gitApi';
 import { useAuthStore } from '../../auth/store/useAuthStore';
 import { readLocal, saveLocal, workspaceKey } from '../sessionStorage';
 import useAgentStream from '../useAgentStream';
@@ -36,6 +38,10 @@ export default function AgentWorkspace({ projectId, projectName }: {
   const account = useAuthStore(state => state.user?.username ?? '');
   const cacheKey = workspaceKey(account, projectId);
   const [saved] = useState<Partial<LocalWorkspace>>(() => { try { return readLocal<LocalWorkspace>(cacheKey) ?? {}; } catch { return {}; } });
+  const [showGit, setShowGit] = useState(false);
+  const [isGitBusy, setIsGitBusy] = useState(false);
+  const [gitCount, setGitCount] = useState(0);
+  const onGitStatus = useCallback((status: GitStatus) => setGitCount(status.changes.length), []);
   const [isSavingFile, setIsSavingFile] = useState(false);
   const savingFile = useRef(false);
   const failedSaves = useRef<Record<string, string>>({});
@@ -283,7 +289,7 @@ export default function AgentWorkspace({ projectId, projectName }: {
     return () => controller.abort();
   }, [projectId, selectedFile, fileRevision, currentJob?.status]);
 
-  const canSubmit = !!prompt.trim() && !isBusy && !isSavingFile && !isMutating && !keysLoading && providers.includes(selectedProvider);
+  const canSubmit = !!prompt.trim() && !isBusy && !isGitBusy && !isSavingFile && !isMutating && !keysLoading && providers.includes(selectedProvider);
   const handleSubmit = async () => {
     if (!canSubmit || savingFile.current || mutating.current) return;
     const draft = selectedFile ? drafts[selectedFile] : undefined;
@@ -294,7 +300,7 @@ export default function AgentWorkspace({ projectId, projectName }: {
     if (jobId) setPrompt('');
   };
   const handleSaveFile = useCallback(async (path: string, draft: Draft) => {
-    if (isBusy || savingFile.current || mutating.current || draft.content === draft.original) return;
+    if (isBusy || isGitBusy || savingFile.current || mutating.current || draft.content === draft.original) return;
     savingFile.current = true;
     setIsSavingFile(true);
     setFileSaveErrors(previous => { const next = { ...previous }; delete next[path]; return next; });
@@ -311,15 +317,15 @@ export default function AgentWorkspace({ projectId, projectName }: {
       savingFile.current = false;
       setIsSavingFile(false);
     }
-  }, [projectId, isBusy]);
+  }, [projectId, isBusy, isGitBusy]);
 
   useEffect(() => {
-    if (isBusy || isSavingFile || isMutating) return;
+    if (isBusy || isGitBusy || isSavingFile || isMutating) return;
     const pending = Object.entries(drafts).find(([path, draft]) => draft.content !== draft.original && failedSaves.current[path] !== draft.content);
     if (!pending) return;
     const timer = setTimeout(() => { void handleSaveFile(pending[0], pending[1]); }, 700);
     return () => clearTimeout(timer);
-  }, [drafts, isBusy, isSavingFile, isMutating, autoSaveRetry, handleSaveFile]);
+  }, [drafts, isBusy, isGitBusy, isSavingFile, isMutating, autoSaveRetry, handleSaveFile]);
 
   const refreshFolder = () => { setTreeRefresh(value => value + 1); };
   const cacheEntry = (parent: string, entry: TreeEntry) => {
@@ -328,7 +334,7 @@ export default function AgentWorkspace({ projectId, projectName }: {
     setEntries([...(entriesByPath.current[''] ?? [])]);
   };
   const createEntry = async () => {
-    if (!creation || !entryName.trim() || isBusy || savingFile.current || mutating.current) return;
+    if (!creation || !entryName.trim() || isBusy || isGitBusy || savingFile.current || mutating.current) return;
     mutating.current = true; setIsMutating(true); setEntryError(null);
     try {
       const { data } = await agentApi.createEntry(projectId, creation.parent, entryName.trim(), creation.kind);
@@ -349,7 +355,7 @@ export default function AgentWorkspace({ projectId, projectName }: {
     finally { mutating.current = false; setIsMutating(false); }
   };
   const deleteEntry = async (entry: TreeEntry) => {
-    if (isBusy || savingFile.current || mutating.current) return;
+    if (isBusy || isGitBusy || savingFile.current || mutating.current) return;
     mutating.current = true; setIsMutating(true); setEntryError(null);
     try {
       const { data } = await agentApi.deleteEntry(projectId, entry.path);
@@ -360,6 +366,9 @@ export default function AgentWorkspace({ projectId, projectName }: {
         else entriesByPath.current[path] = children.filter(item => !inside(item.path));
       }
       setEntries([...(entriesByPath.current[''] ?? [])]);
+      setDrafts(previous => Object.fromEntries(Object.entries(previous).filter(([path]) => !inside(path))));
+      setFileSaveErrors(previous => Object.fromEntries(Object.entries(previous).filter(([path]) => !inside(path))));
+      for (const path of Object.keys(failedSaves.current)) if (inside(path)) delete failedSaves.current[path];
       setExpandedFolders(previous => previous.filter(path => !inside(path)));
       if (inside(treePath)) setTreePath(entry.path.split('/').slice(0, -1).join('/'));
       setPreviewFiles(previous => previous.filter(file => !inside(file.path)));
@@ -371,12 +380,48 @@ export default function AgentWorkspace({ projectId, projectName }: {
     finally { mutating.current = false; setIsMutating(false); }
   };
   const confirmDelete = (entry: TreeEntry) => {
-    if (isBusy || isSavingFile || isMutating) return;
+    if (isBusy || isGitBusy || isSavingFile || isMutating) return;
     Alert.alert(`Delete ${entry.type === 'dir' ? 'folder' : 'file'}?`,
       entry.type === 'dir' ? `Delete “${entry.name}” and its contents?` : `Delete “${entry.name}”?`,
       [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => deleteEntry(entry) }], { cancelable: true });
   };
 
+  const hasLocalEdits = Object.values(drafts).some(draft => draft.content !== draft.original);
+  const failedSavePath = Object.keys(fileSaveErrors).find(path => drafts[path]?.content !== drafts[path]?.original);
+  const gitBlockedReason = isBusy ? 'Wait for the agent to finish before changing Git.' : isMutating ? 'Wait for the file operation to finish.' : hasLocalEdits || isSavingFile
+    ? failedSavePath ? `Could not save ${failedSavePath}. Open it to retry or reload before using Git.` : 'Saving your editor changes…' : null;
+  useEffect(() => {
+    if (showGit || isBusy || isGitBusy || isSavingFile) return;
+    let active = true;
+    const timer = setTimeout(() => { gitApi.status(projectId).then(({ data }) => { if (active) onGitStatus(data.data); }).catch(() => {}); }, 700);
+    return () => { active = false; clearTimeout(timer); };
+  }, [projectId, showGit, isBusy, isGitBusy, isSavingFile, fileRevision, treeRefresh, onGitStatus]);
+  const onGitChanged = (action: GitAction) => {
+    if (['switch', 'pull', 'merge', 'rebase', 'continue', 'abort'].includes(action)) {
+      setDrafts(previous => Object.fromEntries(Object.entries(previous).filter(([, draft]) => draft.content !== draft.original)));
+      setSelectedFile(null); setPreviewFiles([]); entriesByPath.current = {}; setEntries([]); setExpandedFolders([]); setTreePath('');
+    }
+    refreshFolder();
+  };
+  const reloadEditorFile = (path: string) => Alert.alert('Reload workspace file?', `Discard the local edits to “${path}” and load the saved workspace version?`, [
+    { text: 'Cancel', style: 'cancel' }, { text: 'Reload', style: 'destructive', onPress: async () => {
+      fileRequest.current?.abort(); const controller = new AbortController(); fileRequest.current = controller;
+      setFileLoading(true); setFileError(null);
+      try {
+        const { data } = await agentApi.file(projectId, path, controller.signal);
+        if (!data.data || controller.signal.aborted) return;
+        const file = data.data;
+        setDrafts(previous => ({ ...previous, [path]: { original: file.content, content: file.content, etag: file.etag } }));
+        delete failedSaves.current[path]; setFileSaveErrors(previous => { const next = { ...previous }; delete next[path]; return next; });
+      } catch (error) {
+        if (!controller.signal.aborted && axios.isAxiosError(error) && error.response?.status === 404) {
+          setDrafts(previous => { const next = { ...previous }; delete next[path]; return next; });
+          setSelectedFile(previous => previous === path ? null : previous);
+          delete failedSaves.current[path]; setFileSaveErrors(previous => { const next = { ...previous }; delete next[path]; return next; });
+        } else if (!controller.signal.aborted) setFileError(errorMessage(error));
+      } finally { if (!controller.signal.aborted) setFileLoading(false); }
+    } },
+  ]);
   const currentDraft = selectedFile ? drafts[selectedFile] : undefined;
   const fileSaveError = selectedFile ? fileSaveErrors[selectedFile] : undefined;
   const openFiles = () => {
@@ -404,7 +449,7 @@ export default function AgentWorkspace({ projectId, projectName }: {
           <View style={styles.panelHeading}>
             <Text style={styles.panelTitle} numberOfLines={1} onPress={() => { setTreePath(''); setCreation(null); }} accessibilityRole="button" accessibilityLabel="Select project root">{projectName}</Text>
             {(['file', 'dir'] as const).map(kind => <TouchableOpacity key={kind} style={styles.addEntryButton}
-              disabled={isBusy || isSavingFile || isMutating} accessibilityRole="button" accessibilityLabel={kind === 'file' ? 'New file' : 'New folder'}
+              disabled={isBusy || isGitBusy || isSavingFile || isMutating} accessibilityRole="button" accessibilityLabel={kind === 'file' ? 'New file' : 'New folder'}
               onPress={() => { if (treePath) setExpandedFolders(previous => previous.includes(treePath) ? previous : [...previous, treePath]); setCreation({ kind, parent: treePath }); setEntryName(''); setEntryError(null); }}>
               <Ionicons name={kind === 'file' ? 'document-outline' : 'folder-outline'} size={21} color="#344660" />
               <View style={styles.addEntryBadge}><Ionicons name="add" size={12} color="#344660" /></View>
@@ -454,10 +499,15 @@ export default function AgentWorkspace({ projectId, projectName }: {
               accessibilityRole="button" accessibilityLabel="Open project files">
               <Ionicons name="folder-open-outline" size={21} color="#344660" />
             </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={() => setShowGit(true)} accessibilityRole="button" accessibilityLabel={gitCount ? `Open Git, ${gitCount} changed files` : 'Open Git'}>
+              <Ionicons name="git-branch-outline" size={21} color="#344660" />
+              {gitCount > 0 && <View style={styles.gitBadge}><Text style={styles.gitBadgeText}>{gitCount > 99 ? '99+' : gitCount}</Text></View>}
+            </TouchableOpacity>
             <Text style={styles.fileTitle} numberOfLines={1}>{selectedFile ?? 'Files'}</Text>
           </View>
           {!!fileSaveError && <Text style={styles.editorSaveError} accessibilityLiveRegion="polite">{fileSaveError}</Text>}
           {!!fileSaveError && <TouchableOpacity onPress={() => { delete failedSaves.current[selectedFile!]; setAutoSaveRetry(value => value + 1); }} accessibilityRole="button" accessibilityLabel="Retry automatic save"><Text style={styles.lightAction}>Retry</Text></TouchableOpacity>}
+          {!!fileSaveError && selectedFile && <TouchableOpacity onPress={() => reloadEditorFile(selectedFile)} accessibilityRole="button" accessibilityLabel="Reload workspace file"><Text style={styles.lightAction}>Reload workspace file</Text></TouchableOpacity>}
           {fileLoading ? <ActivityIndicator style={styles.center} color={colors.textSecondary} /> : fileError ? (
             <View style={styles.center}><Text style={styles.editorHint}>{fileError}</Text>
               <TouchableOpacity style={styles.iconButton} onPress={() => selectedFile && openFile({ name: selectedFile, path: selectedFile, type: 'file', size: 0 })}>
@@ -466,7 +516,7 @@ export default function AgentWorkspace({ projectId, projectName }: {
             </View>
           ) : currentDraft ? (
             <TextInput style={styles.code} multiline textAlignVertical="top" autoCapitalize="none" autoCorrect={false}
-              spellCheck={false} accessibilityLabel={`Edit ${selectedFile}`} value={currentDraft.content}
+              spellCheck={false} editable={!isGitBusy} accessibilityLabel={`Edit ${selectedFile}`} value={currentDraft.content}
               onChangeText={content => setDrafts(previous => ({ ...previous, [selectedFile!]: { ...previous[selectedFile!], content } }))} />
           ) : <View style={styles.center}>
             <TouchableOpacity style={styles.openFileButton} onPress={openFiles}
@@ -486,6 +536,9 @@ export default function AgentWorkspace({ projectId, projectName }: {
         onAccessibilityAction={event => { setEditorRatio(clampEditorRatio(editorRatio + (event.nativeEvent.actionName === 'increment' ? 0.08 : -0.08), layoutHeight)); }}>
         <View style={styles.verticalGrip} />
       </View>
+      <GitPanel visible={showGit} projectId={projectId} blockedReason={gitBlockedReason} refreshKey={treeRefresh + fileRevision}
+        onClose={() => setShowGit(false)} onStatus={onGitStatus} onBusyChange={setIsGitBusy} onChanged={onGitChanged}
+        onOpenFile={path => { setShowGit(false); void openFile({ path, name: path.split('/').at(-1)!, type: 'file', size: 0 }); }} />
       <Modal visible={isCompact && showFiles} transparent animationType="fade" onRequestClose={() => setShowFiles(false)}>
         <View style={styles.drawerOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowFiles(false)}
@@ -517,7 +570,7 @@ export default function AgentWorkspace({ projectId, projectName }: {
         <View style={styles.inputRing}>
           <Text style={styles.promptPrefix} accessible={false}>›</Text>
           <TextInput style={styles.prompt} placeholder="Ask or describe a change…" placeholderTextColor="#8190A5"
-            multiline textAlignVertical="center" value={prompt} onChangeText={setPrompt} editable={!isBusy} autoCapitalize="none" autoCorrect={false} accessibilityLabel="Agent prompt" />
+            multiline textAlignVertical="center" value={prompt} onChangeText={setPrompt} editable={!isBusy && !isGitBusy} autoCapitalize="none" autoCorrect={false} accessibilityLabel="Agent prompt" />
           <TouchableOpacity style={[styles.sendButton, !canSubmit && !isBusy && styles.disabled]} onPress={isBusy && isCurrentProject ? stop : handleSubmit} disabled={isBusy ? !isCurrentProject : !canSubmit} accessibilityLabel={isBusy ? "Stop agent" : "Send prompt"} accessibilityRole="button">
             {isBusy ? <Ionicons name="stop" size={18} color="#FFFFFF" /> : <>
               <Ionicons name="arrow-up" size={21} color="#FFFFFF" />
@@ -545,6 +598,8 @@ const styles = StyleSheet.create({
   workbench: { flex: 1, minHeight: 100, flexDirection: 'row', marginHorizontal: 10 },
   editor: { flex: 1, minWidth: 0, backgroundColor: colors.background, borderWidth: 1, borderColor: '#CBD3DF', borderRadius: 18, overflow: 'hidden' },
   editorHeader: { height: 48, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E9EF' },
+  gitBadge: { position: 'absolute', right: -2, top: 1, minWidth: 16, height: 16, paddingHorizontal: 3, borderRadius: 8, backgroundColor: '#237A53', alignItems: 'center', justifyContent: 'center' },
+  gitBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '700' },
   fileTitle: { flex: 1, color: '#344660', fontSize: 12, fontWeight: '600' },
   editorSaveError: { color: colors.error, fontSize: 12, lineHeight: 18, paddingHorizontal: 16, paddingVertical: 8 },
   code: { flex: 1, color: colors.text, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, fontSize: 13, lineHeight: 22, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
