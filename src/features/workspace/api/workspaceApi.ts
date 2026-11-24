@@ -41,6 +41,14 @@ export interface CreateProjectRequest {
   createIfNotExists?: boolean;
 }
 
+export interface TreeEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+  size: number;
+  previewOnly?: boolean;
+}
+
 interface ApiResponse<T> {
   statusCode: string;
   message: string;
@@ -48,6 +56,12 @@ interface ApiResponse<T> {
 }
 
 export const workspaceApi = {
+  fetchTree: (id: string, path = '', signal?: AbortSignal) =>
+    axiosClient.get<ApiResponse<TreeEntry[]>>(WORKSPACE_ENDPOINTS.PROJECT_TREE(id, path), { signal }),
+
+  fetchFile: (id: string, path: string, signal?: AbortSignal) =>
+    axiosClient.get<ApiResponse<{ path: string; content: string }>>(WORKSPACE_ENDPOINTS.PROJECT_FILE(id, path), { signal }),
+
   fetchRepos: () =>
     axiosClient.get<ApiResponse<GithubRepo[]>>(WORKSPACE_ENDPOINTS.REPOS),
 

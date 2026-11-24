@@ -1,8 +1,9 @@
 import React from 'react';
 import { Text, View, StyleSheet } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { BottomTabBar, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fontSize, spacing } from '../theme/appTheme';
+import { colors, fontSize } from '../theme/appTheme';
 import { useAuthStore } from '../../features/auth/store/useAuthStore';
 import ProfileScreen, { getUserInitials } from '../../features/profile/screens/ProfileScreen';
 import ConnectScreen from '../../features/settings/screens/ConnectScreen';
@@ -25,19 +26,35 @@ const tabs: Array<{
 }> = [
   { name: 'Workspace', label: 'Workspace', icon: 'grid-outline' },
   { name: 'Agent', label: 'Agent', icon: 'sparkles-outline' },
-  { name: 'Connect', label: 'Connect', icon: 'settings-outline' },
+  { name: 'Connect', label: 'Connect', icon: 'link-outline' },
 ];
 
 export default function MainTabs() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
+      safeAreaInsets={{ bottom: 0 }}
+      tabBar={(props) => (
+        <View style={[styles.tabBarContainer, { paddingBottom: Math.max(insets.bottom - 20, 6) }]}>
+          <BottomTabBar {...props} />
+        </View>
+      )}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: '#B8C4D6',
+        tabBarActiveBackgroundColor: 'transparent',
+        tabBarLabelPosition: 'below-icon',
+        tabBarLabel: ({ children, color, focused }) => (
+          <View style={styles.tabLabelContainer}>
+            <Text style={[styles.tabLabel, { color }, focused && styles.activeTabLabel]}>
+              {children}
+            </Text>
+          </View>
+        ),
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: styles.tabItem,
-        tabBarLabelStyle: styles.tabLabel,
       }}
     >
       {tabs.map((tab) => (
@@ -79,38 +96,33 @@ function ProfileTabIcon({ color }: { color: string }) {
   );
 }
 
-function TabPlaceholderScreen() {
-  return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Atlas</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  tabBarContainer: {
     backgroundColor: colors.background,
-    padding: spacing.lg,
-  },
-  title: {
-    color: colors.text,
-    fontSize: fontSize.xl,
-    fontWeight: '700',
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
   },
   tabBar: {
-    height: 64,
-    width: '80%',
-    alignSelf: 'center',
-    paddingBottom: spacing.sm,
-    paddingTop: spacing.sm,
-    backgroundColor: colors.background,
-    borderTopColor: colors.border,
+    height: 72,
+    width: '100%',
+    maxWidth: 440,
+    padding: 6,
+    backgroundColor: '#18243B',
+    borderWidth: 1,
+    borderTopWidth: 1,
+    borderColor: '#2A3850',
+    borderRadius: 36,
+    shadowColor: '#18243B',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
   },
   tabItem: {
-    maxWidth: 78,
+    borderRadius: 28,
+    overflow: 'hidden',
+    paddingVertical: 4,
   },
   profileTabIcon: {
     width: 30,
@@ -131,7 +143,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabLabel: {
-    fontSize: fontSize.xs,
+    fontSize: 10,
     fontWeight: '600',
+  },
+  tabLabelContainer: {
+    alignItems: 'center',
+  },
+  activeTabLabel: {
+    fontWeight: '700',
   },
 });

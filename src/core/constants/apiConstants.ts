@@ -17,11 +17,14 @@ export const WORKSPACE_ENDPOINTS = {
   PROJECTS: '/api/workspace/projects',
   PROJECT_TREE: (id: string, path = '') =>
     `/api/workspace/projects/${id}/tree${path ? `?path=${encodeURIComponent(path)}` : ''}`,
+  PROJECT_FILE: (id: string, path: string) =>
+    `/api/workspace/projects/${id}/file?path=${encodeURIComponent(path)}`,
 } as const;
 
 export const AGENT_ENDPOINTS = {
   JOBS: '/api/agent/jobs',
   JOB: (jobId: string) => `/api/agent/jobs/${jobId}`,
+  JOB_FILES: (jobId: string) => `/api/agent/jobs/${jobId}/files`,
   PROJECT_JOBS: (projectId: string) => `/api/agent/jobs/project/${projectId}`,
   PUSH: (jobId: string) => `/api/agent/git/push/${jobId}`,
   PR: (jobId: string) => `/api/agent/git/pr/${jobId}`,
