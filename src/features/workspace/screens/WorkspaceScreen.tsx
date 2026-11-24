@@ -71,10 +71,7 @@ export default function WorkspaceScreen() {
 
   const handleProjectPress = useCallback((project: WorkspaceProject) => {
     setActiveProject(project.id);
-    nav.navigate('Prompt', {
-      projectId: String(project.id),
-      projectName: project.projectName,
-    });
+    nav.navigate('Tabs', { screen: 'Agent' });
   }, [setActiveProject, nav]);
 
   const handleProjectLongPress = useCallback((project: WorkspaceProject) => {

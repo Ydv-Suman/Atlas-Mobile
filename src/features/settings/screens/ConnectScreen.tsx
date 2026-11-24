@@ -20,6 +20,13 @@ import { AGENT_ENDPOINTS } from '../../../core/constants/apiConstants';
 import ErrorBanner from '../../../shared/components/ErrorBanner';
 import AtlasButton from '../../../shared/components/AtlasButton';
 
+const PROVIDERS = ['openai', 'claude', 'gemini'] as const;
+const PROVIDER_LABELS: Record<string, string> = {
+  openai: 'OpenAI',
+  claude: 'Claude',
+  gemini: 'Gemini',
+};
+
 interface ApiKeyInfo {
   id: string;
   provider: string;
@@ -37,7 +44,7 @@ export default function ConnectScreen() {
   const [keys, setKeys] = useState<ApiKeyInfo[]>([]);
   const [isLoadingKeys, setIsLoadingKeys] = useState(false);
   const [showAddKey, setShowAddKey] = useState(false);
-  const [newProvider, setNewProvider] = useState('');
+  const [newProvider, setNewProvider] = useState<string>('');
   const [newApiKey, setNewApiKey] = useState('');
   const [isSavingKey, setIsSavingKey] = useState(false);
 
@@ -161,14 +168,19 @@ export default function ConnectScreen() {
 
         {showAddKey && (
           <View style={styles.addKeyForm}>
-            <TextInput
-              style={styles.input}
-              placeholder="Provider (e.g. claude, openai)"
-              placeholderTextColor={colors.textMuted}
-              value={newProvider}
-              onChangeText={setNewProvider}
-              autoCapitalize="none"
-            />
+            <View style={styles.providerPicker}>
+              {PROVIDERS.map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.providerOption, newProvider === p && styles.providerOptionActive]}
+                  onPress={() => setNewProvider(p)}
+                >
+                  <Text style={[styles.providerOptionText, newProvider === p && styles.providerOptionTextActive]}>
+                    {PROVIDER_LABELS[p]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <TextInput
               style={styles.input}
               placeholder="API Key"
@@ -248,6 +260,32 @@ const styles = StyleSheet.create({
   keyProvider: { fontSize: fontSize.md, fontWeight: '600', color: colors.text, textTransform: 'capitalize' },
   keyHint: { fontSize: fontSize.sm, color: colors.textMuted },
   addKeyForm: { marginTop: spacing.md, gap: spacing.sm },
+  providerPicker: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  providerOption: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  providerOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '10',
+  },
+  providerOptionText: {
+    fontSize: fontSize.sm,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  providerOptionTextActive: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
