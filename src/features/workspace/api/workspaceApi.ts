@@ -12,6 +12,7 @@ export interface GithubRepo {
   default_branch: string;
   private: boolean;
   fork: boolean;
+  permissions?: { admin?: boolean; push?: boolean };
   stargazers_count: number;
   updated_at: string;
   owner: { login: string; avatar_url: string };
@@ -23,7 +24,7 @@ export interface WorkspaceProject {
   framework: string | null;
   githubUrl: string;
   repoOwner: string;
-  repoOwnership: 'PERSONAL' | 'ORGANIZATION';
+  repoOwnership: 'OWNER' | 'COLLABORATOR' | 'FORK';
   repoVisibility: 'PUBLIC' | 'PRIVATE';
   projectType: string | null;
   createdAt: string;
@@ -35,8 +36,8 @@ export interface CreateProjectRequest {
   framework?: string;
   githubUrl: string;
   repoOwner: string;
-  repoOwnership: string;
-  repoVisibility: string;
+  repoOwnership: WorkspaceProject['repoOwnership'];
+  repoVisibility: WorkspaceProject['repoVisibility'];
   projectType?: string;
   createIfNotExists?: boolean;
 }
@@ -53,6 +54,16 @@ interface ApiResponse<T> {
   statusCode: string;
   message: string;
   data: T | null;
+}
+
+export function projectFromRepo(repo: GithubRepo): CreateProjectRequest {
+  return {
+    projectName: repo.name,
+    githubUrl: repo.html_url,
+    repoOwner: repo.owner.login,
+    repoOwnership: repo.fork ? 'FORK' : repo.permissions?.admin ? 'OWNER' : 'COLLABORATOR',
+    repoVisibility: repo.private ? 'PRIVATE' : 'PUBLIC',
+  };
 }
 
 export const workspaceApi = {

@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, fontSize, spacing, borderRadius } from '../../../core/theme/appTheme';
 import { useWorkspaceStore } from '../store/useWorkspaceStore';
-import { GithubRepo, WorkspaceProject } from '../api/workspaceApi';
+import { projectFromRepo, GithubRepo, WorkspaceProject } from '../api/workspaceApi';
 import { MainStackParamList } from '../../../core/navigation/MainStack';
 import ErrorBanner from '../../../shared/components/ErrorBanner';
 
@@ -55,13 +55,7 @@ export default function WorkspaceScreen() {
         {
           text: 'Create',
           onPress: async () => {
-            const ok = await createProject({
-              projectName: repo.name,
-              githubUrl: repo.html_url,
-              repoOwner: repo.owner.login,
-              repoOwnership: 'PERSONAL',
-              repoVisibility: repo.private ? 'PRIVATE' : 'PUBLIC',
-            });
+            const ok = await createProject(projectFromRepo(repo));
             if (ok) fetchProjects();
           },
         },
