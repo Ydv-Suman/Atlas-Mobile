@@ -8,8 +8,11 @@ Atlas is a mobile coding workspace for iOS and Android. Connect a GitHub reposit
 
 ## Demo
 
+<div align="center">
+
 https://github.com/user-attachments/assets/e967ce36-de9d-4d64-9210-8e1faa4d3415
 
+</div>
 
 ## Features
 
